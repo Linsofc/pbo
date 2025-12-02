@@ -1,183 +1,280 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { sendLogToBackend } from "@/utils/logger";
 
 interface NavbarProps {
-  username: string;
-  onUpdateClick: () => void; // Prop baru untuk handle tombol Update
+    username: string;
+    onUpdateClick: () => Promise<boolean>;
 }
 
 export default function Navbar({ username, onUpdateClick }: NavbarProps) {
-  const router = useRouter();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  
-  // Dummy Saldo (Nanti bisa diambil dari API/Database)
-  const [saldo, setSaldo] = useState('Rp 500.000'); 
-  const [isUpdating, setIsUpdating] = useState(false);
+    const router = useRouter();
+    const pathname = usePathname();
+    
+    // State UI
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [saldo, setSaldo] = useState<number | null>(null);
+    const [isUpdating, setIsUpdating] = useState(false);
+    
+    // Refs
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const navRef = useRef<HTMLDivElement>(null);
+    const tabsRef = useRef<(HTMLAnchorElement | null)[]>([]);
 
-  // Ref untuk klik di luar dropdown agar menutup otomatis
-  const dropdownRef = useRef<HTMLDivElement>(null);
+    // State untuk Animasi Garis Bawah (Sliding Underline)
+    const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0, opacity: 0 });
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+    // Daftar Menu
+    const navItems = [
+        { name: 'Topup', path: '/' },
+        { name: 'Cek Transaksi', path: '/riwayat' },
+        { name: 'Kalkulator', path: '/kalkulator' },
+    ];
+
+    // --- LOGIC ANIMASI GARIS ---
+    
+    const updateIndicator = (element: HTMLElement) => {
+        if (!element) return;
+        setIndicatorStyle({
+            left: element.offsetLeft,
+            width: element.offsetWidth,
+            opacity: 1
+        });
+    };
+
+    // 1. Set posisi awal berdasarkan halaman aktif saat ini
+    useEffect(() => {
+        const activeIndex = navItems.findIndex(item => item.path === pathname);
+        if (activeIndex !== -1 && tabsRef.current[activeIndex]) {
+            updateIndicator(tabsRef.current[activeIndex]!);
+        }
+    }, [pathname]);
+
+    // 2. Event Handler Hover
+    const handleMouseEnter = (index: number) => {
+        if (tabsRef.current[index]) {
+            updateIndicator(tabsRef.current[index]!);
+        }
+    };
+
+    // 3. Event Handler Mouse Leave (Kembali ke aktif)
+    const handleMouseLeave = () => {
+        const activeIndex = navItems.findIndex(item => item.path === pathname);
+        if (activeIndex !== -1 && tabsRef.current[activeIndex]) {
+            updateIndicator(tabsRef.current[activeIndex]!);
+        } else {
+            setIndicatorStyle(prev => ({ ...prev, opacity: 0 }));
+        }
+    };
+
+    // --- LOGIC LAINNYA (Profile, Balance, dll) ---
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsProfileOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        if (username) fetchBalance();
+    }, [username]);
+
+    const fetchBalance = async () => {
+        try {
+            const res = await fetch("/api/digi/balance", { method: "POST" });
+            const data = await res.json();
+            if (data.success) setSaldo(data.balance);
+        } catch (error) {
+            console.error("Gagal mengambil saldo");
+        }
+    };
+
+    const handleLogout = () => {
+        sendLogToBackend("auth", `User '${username}' logout dari sistem.`);
+        localStorage.removeItem("isLoggedIn");
+        localStorage.removeItem("username");
+        router.replace("/login");
+    };
+
+    const handleUpdateWrapper = async () => {
+        setIsUpdating(true);
+        sendLogToBackend("system", `User '${username}' sinkronisasi data.`);
+        await onUpdateClick();
+        await fetchBalance();
+        setIsUpdating(false);
         setIsProfileOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    };
 
-  const handleLogout = () => {
-    localStorage.removeItem('isLoggedIn');
-    localStorage.removeItem('username');
-    router.push('/login');
-  };
+    const formatRupiah = (amount: number | null) => {
+        if (amount === null) return "Rp ...";
+        return new Intl.NumberFormat("id-ID", {
+            style: "currency",
+            currency: "IDR",
+            minimumFractionDigits: 0,
+        }).format(amount);
+    };
 
-  const handleUpdateWrapper = async () => {
-    setIsUpdating(true);
-    // Simulasi loading update
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    onUpdateClick(); // Panggil fungsi update dari Parent
-    setIsUpdating(false);
-    setIsProfileOpen(false); // Tutup dropdown
-    alert('Produk berhasil diupdate dari Digiflazz!');
-  };
-
-  return (
-    <nav className="border-b border-gray-800 bg-[#18181b]/95 backdrop-blur-md sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          
-          {/* --- LOGO --- */}
-          <div className="flex-shrink-0">
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-9 h-9 rounded-full p-[2px] bg-gradient-to-tr from-blue-500 to-purple-500 group-hover:shadow-lg group-hover:shadow-blue-500/20 transition-all duration-300">
-                <img 
-                  src="/logos/logo.png" 
-                  alt="Logo" 
-                  className="w-full h-full rounded-full bg-[#0a0a0b] object-cover" 
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              </div>
-              <span className="font-bold text-xl tracking-wide text-white group-hover:text-blue-400 transition">
-                Linsofc<span className="text-blue-500">Store</span>
-              </span>
-            </Link>
-          </div>
-
-          {/* --- DESKTOP MENU (Tengah) --- */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link href="/" className="text-gray-300 hover:text-white font-medium transition duration-200 text-sm">
-              Beranda
-            </Link>
-            <Link href="/riwayat" className="text-gray-300 hover:text-blue-400 font-medium transition duration-200 text-sm flex items-center gap-1">
-              Riwayat
-            </Link>
-            <Link href="/kalkulator" className="text-gray-300 hover:text-white font-medium transition duration-200 text-sm">
-              Kalkulator WR
-            </Link>
-          </div>
-          
-          {/* --- RIGHT SECTION (Profile & Mobile Toggle) --- */}
-          <div className="flex items-center gap-4">
-            
-            {/* PROFILE DROPDOWN (Desktop & Mobile) */}
-            <div className="relative" ref={dropdownRef}>
-                <button 
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
-                  className="flex items-center gap-3 focus:outline-none"
-                >
-                    <div className="hidden md:flex flex-col items-end">
-                        <span className="text-sm font-semibold text-gray-200">Hi, {username}</span>
-                        <span className="text-[10px] text-blue-400 font-mono">{saldo}</span>
+    return (
+        <nav className="bg-[#121212] border-b border-gray-800 sticky top-0 z-50 font-sans">
+            <div className="max-w-7xl mx-auto px-4 lg:px-8">
+                <div className="flex items-center justify-between h-16">
+                    
+                    {/* --- LEFT: LOGO --- */}
+                    <div className="flex-shrink-0 flex items-center gap-6">
+                        <Link href="/" className="group relative w-10 h-10">
+                            {/* Glow Biru */}
+                            <div className="absolute inset-0 bg-blue-600 blur-lg opacity-20 group-hover:opacity-40 transition duration-500 rounded-full"></div>
+                            <img
+                                src="/logos/logo.png"
+                                alt="Logo"
+                                className="relative w-full h-full object-contain"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
+                        </Link>
                     </div>
-                    <div className="w-9 h-9 rounded-full bg-gray-700 border border-gray-600 overflow-hidden hover:border-blue-500 transition">
-                         <img src={`https://ui-avatars.com/api/?name=${username}&background=0D8ABC&color=fff`} alt="User" />
-                    </div>
-                </button>
 
-                {/* --- DROPDOWN CONTENT --- */}
-                {isProfileOpen && (
-                    <div className="absolute right-0 mt-3 w-64 bg-[#18181b] border border-gray-700 rounded-xl shadow-2xl py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
-                        {/* Info Saldo Mobile Only (opsional jika mau ditampilkan lagi) */}
-                        <div className="px-4 py-3 border-b border-gray-800 md:hidden">
-                            <p className="text-sm text-gray-400">Login sebagai</p>
-                            <p className="font-semibold text-white">{username}</p>
-                        </div>
+                    {/* --- CENTER: NAVIGATION LINKS (Desktop Only) --- */}
+                    <div 
+                        className="hidden md:flex items-center gap-8 relative h-full" 
+                        ref={navRef}
+                        onMouseLeave={handleMouseLeave}
+                    >
+                        {navItems.map((item, index) => {
+                            const isActive = pathname === item.path;
+                            return (
+                                <Link
+                                    key={item.path}
+                                    href={item.path}
+                                    ref={el => { tabsRef.current[index] = el }}
+                                    onMouseEnter={() => handleMouseEnter(index)}
+                                    className={`
+                                        relative z-10 h-full flex items-center px-2 text-sm font-bold tracking-wide transition-colors duration-300
+                                        ${isActive ? 'text-white' : 'text-gray-400 hover:text-white'}
+                                    `}
+                                >
+                                    {item.name}
+                                </Link>
+                            );
+                        })}
+
+                        {/* THE MAGIC SLIDING LINE (BLUE) */}
+                        <div
+                            className="absolute bottom-0 h-[3px] bg-blue-500 shadow-[0_-2px_10px_rgba(59,130,246,0.6)] rounded-t-full transition-all duration-300 ease-out z-0"
+                            style={{
+                                left: indicatorStyle.left,
+                                width: indicatorStyle.width,
+                                opacity: indicatorStyle.opacity,
+                            }}
+                        />
+                    </div>
+
+                    {/* --- RIGHT: PROFILE & MOBILE BUTTON --- */}
+                    <div className="flex items-center gap-4">
                         
-                        {/* SECTION SALDO */}
-                        <div className="px-4 py-3 bg-blue-600/10 mx-2 rounded-lg mb-2 border border-blue-600/20">
-                            <p className="text-xs text-blue-300 uppercase font-bold tracking-wider">Saldo Digiflazz</p>
-                            <p className="text-lg font-bold text-white mt-1">{saldo}</p>
+                        {/* Profile Dropdown */}
+                        <div className="relative" ref={dropdownRef}>
+                            <button
+                                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                className="flex items-center gap-3 focus:outline-none group pl-2 py-1 rounded-lg hover:bg-white/5 transition-all"
+                            >
+                                <div className="hidden lg:flex flex-col items-end">
+                                    {/* Hover Text Biru */}
+                                    <span className="text-xs font-bold text-white group-hover:text-blue-400 transition">
+                                        {username}
+                                    </span>
+                                    <span className="text-[10px] text-blue-500 font-mono">
+                                        {formatRupiah(saldo)}
+                                    </span>
+                                </div>
+                                {/* Ring Biru saat Hover */}
+                                <div className="w-9 h-9 rounded-full bg-gray-800 p-[2px] ring-2 ring-transparent group-hover:ring-blue-500/50 transition">
+                                    <img
+                                        // Avatar Background Biru (2563EB)
+                                        src={`https://ui-avatars.com/api/?name=${username}&background=2563EB&color=fff&bold=true`}
+                                        alt="User"
+                                        className="w-full h-full rounded-full object-cover"
+                                    />
+                                </div>
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {isProfileOpen && (
+                                <div className="absolute right-0 mt-3 w-64 bg-[#1a1a1c] border border-gray-800 rounded-xl shadow-2xl py-2 animate-in fade-in slide-in-from-top-2 z-50">
+                                    <div className="px-4 py-3 border-b border-gray-800 lg:hidden">
+                                        <p className="text-white font-bold">{username}</p>
+                                        <p className="text-blue-500 text-sm font-mono mt-1">{formatRupiah(saldo)}</p>
+                                    </div>
+                                    <div className="p-2 space-y-1">
+                                        <button
+                                            onClick={handleUpdateWrapper}
+                                            disabled={isUpdating}
+                                            className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-lg flex items-center gap-3 transition-colors"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${isUpdating ? "animate-spin text-blue-400" : "text-gray-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                            Sync Data
+                                        </button>
+                                        <button
+                                            onClick={handleLogout}
+                                            className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg flex items-center gap-3 transition-colors"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                            </svg>
+                                            Log Out
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {/* MENU ITEMS */}
+                        {/* Mobile Menu Button (Hamburger) */}
                         <button 
-                            onClick={handleUpdateWrapper}
-                            disabled={isUpdating}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-2 transition"
+                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            className="md:hidden p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${isUpdating ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                {isMobileMenuOpen ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                ) : (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                )}
                             </svg>
-                            {isUpdating ? 'Sedang Update...' : 'Update Produk'}
-                        </button>
-
-                        <div className="border-t border-gray-800 my-1"></div>
-
-                        <button 
-                            onClick={handleLogout}
-                            className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 flex items-center gap-2 transition"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                            </svg>
-                            Keluar
                         </button>
                     </div>
-                )}
+                </div>
             </div>
 
-            {/* HAMBURGER BUTTON (Mobile Only) */}
-            <button 
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 text-gray-400 hover:text-white transition"
-            >
-                {isMobileMenuOpen ? (
-                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                     </svg>
-                ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                    </svg>
-                )}
-            </button>
-
-          </div>
-        </div>
-      </div>
-
-      {/* --- MOBILE MENU DRAWER --- */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-[#18181b] border-b border-gray-800 animate-in slide-in-from-top-5">
-            <div className="px-4 pt-2 pb-4 space-y-1">
-                <Link href="/" className="block px-3 py-2 rounded-md text-base font-medium text-white bg-gray-900">
-                    Beranda
-                </Link>
-                <Link href="/riwayat" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700">
-                    Riwayat Transaksi
-                </Link>
-                <Link href="/kalkulator" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700">
-                    Kalkulator WR
-                </Link>
-            </div>
-        </div>
-      )}
-    </nav>
-  );
+            {/* --- MOBILE MENU DROPDOWN --- */}
+            {isMobileMenuOpen && (
+                <div className="md:hidden bg-[#121212] border-t border-gray-800 animate-in slide-in-from-top-5 absolute w-full left-0 shadow-2xl z-40">
+                    <div className="p-4 space-y-2">
+                        {navItems.map((item) => (
+                            <Link
+                                key={item.path}
+                                href={item.path}
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className={`block px-4 py-3 rounded-lg font-medium transition-colors ${
+                                    pathname === item.path
+                                    ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20'
+                                    : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                                }`}
+                            >
+                                {item.name}
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </nav>
+    );
 }

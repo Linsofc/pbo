@@ -7,8 +7,6 @@ const banners = [
   '/banners/banner-1.png',
   '/banners/banner-2.png',
   '/banners/banner-3.png',
-  '/banners/banner-16.png',
-  '/banners/banner-22.png',
 ];
 
 export default function BannerSlider() {

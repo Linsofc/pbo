@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto'; // Bawaan Node.js untuk MD5
-import { sendLogToBackend } from '@/utils/logger'; // Helper log ke Python
+import crypto from 'crypto'; 
+import { sendLogToBackend } from '@/utils/logger'; 
 
 export async function POST(request: Request) {
   try {
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Konfigurasi Server Belum Lengkap' });
     }
 
-    // 1. Generate Signature Digiflazz (md5(username + key + ref_id))
+    // 1. Generate Signature
     const signature = crypto.createHash('md5')
       .update(username + key + ref_id)
       .digest('hex');
@@ -36,30 +36,45 @@ export async function POST(request: Request) {
 
     const data = await res.json();
 
-    // 3. Logika Response & Logging ke Python
+    // 3. Validasi Response
     if (data.data) {
-        const status = data.data.status;
-        const sn = data.data.sn || '';
-        const message = data.data.message;
+        const { status, sn, rc, message } = data.data; // Ambil RC & Status
+        const serialNumber = sn || '';
 
-        if (status === 'Sukses' || status === 'Pending') {
-            // Log SUKSES ke Python
-            await sendLogToBackend('transaction', `[SUCCESS] Order ${ref_id} - ${buyer_sku_code} ke ${customer_no}. SN: ${sn}`);
+        // --- UPDATE LOGIC LOGGING ---
+        // Format Log: [STATUS] Order REF - SKU. Info Tambahan | CUSTOMER_NO
+        // Customer No di bagian akhir dipisah '|' sangat penting untuk Auto-Update Status
+
+        // RC 00 = Sukses Mutlak
+        if (rc === '00' || status === 'Sukses') {
+            await sendLogToBackend('transaction', `[SUCCESS] Order ${ref_id} - ${buyer_sku_code}. SN: ${serialNumber} | ${customer_no}`);
             
             return NextResponse.json({ 
                 success: true, 
-                message: 'Transaksi Berhasil/Pending', 
+                message: 'Transaksi Berhasil', 
                 data: data.data 
             });
+        
+        // RC 03 = Pending (Jangan dicatat Success!)
+        } else if (rc === '03' || status === 'Pending') {
+            await sendLogToBackend('transaction', `[PENDING] Order ${ref_id} - ${buyer_sku_code}. Status diproses | ${customer_no}`);
+            
+            return NextResponse.json({ 
+                success: true, 
+                message: 'Transaksi Pending (Sedang Diproses)', 
+                data: data.data 
+            });
+
+        // Sisanya = GAGAL (Saldo kurang, gangguan, no salah, dll)
         } else {
-            // Log GAGAL ke Python
-            await sendLogToBackend('error', `[FAILED] Order ${ref_id} - ${buyer_sku_code}. Reason: ${message}`);
+            await sendLogToBackend('transaction', `[FAILED] Order ${ref_id} - ${buyer_sku_code}. Reason: ${message} | ${customer_no}`);
             
             return NextResponse.json({ success: false, message: message || 'Transaksi Gagal' });
         }
+
     } else {
-        // Error dari API Digiflazz (misal Saldo kurang/IP salah)
-        await sendLogToBackend('error', `[API ERROR] Digiflazz response invalid: ${JSON.stringify(data)}`);
+        // Error Sistem/API (Response tidak standar)
+        await sendLogToBackend('error', `[API ERROR] Digiflazz invalid: ${data.message}`);
         return NextResponse.json({ success: false, message: data.message || 'Error Digiflazz' });
     }
 
