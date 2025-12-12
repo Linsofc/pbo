@@ -1,4 +1,3 @@
-// app/kalkulator/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -10,9 +9,6 @@ export default function KalkulatorPage() {
   const [username, setUsername] = useState('');
   const { showNotification } = useNotification();
 
-  // --- STATE CALCULATOR ---
-  // Menggunakan string agar input fleksibel (bisa kosong & bisa desimal)
-  
   // 1. Win Rate
   const [totalMatch, setTotalMatch] = useState('');
   const [totalWr, setTotalWr] = useState('');

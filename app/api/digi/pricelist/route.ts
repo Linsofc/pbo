@@ -33,12 +33,8 @@ export async function POST() {
 
     const result = await res.json();
 
-    // --- LOGIKA VALIDASI BARU ---
-    
-    // 1. Cek apakah ada Data Produk valid
     if (result.data && Array.isArray(result.data) && result.data.length > 0) {
         
-        // Log sukses
         await sendLogToBackend('system', `[SUCCESS] Berhasil memperbarui ${result.data.length} produk.`);
         
         return NextResponse.json({
@@ -47,11 +43,9 @@ export async function POST() {
         });
 
     } else {
-        // 2. Cek Error Spesifik (Limitasi / Saldo / IP)
         const errorMsg = result.message || 'Gagal mengambil data dari Digiflazz';
         const errorCode = result.rc || 'UNKNOWN';
 
-        // Jika kena limit (RC 83) atau error lain, catat ke ERROR LOG
         console.error(`[API FAILED] RC: ${errorCode} - ${errorMsg}`);
         await sendLogToBackend('error', `[PRICELIST FAILED] RC:${errorCode} - ${errorMsg}`);
         

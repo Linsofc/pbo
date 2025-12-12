@@ -1,4 +1,3 @@
-// app/riwayat/page.tsx
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -17,16 +16,13 @@ export default function RiwayatPage() {
   const [loading, setLoading] = useState(true);
   const [username, setUsername] = useState('');
   
-  // State Log
   const [trxLogs, setTrxLogs] = useState<LogData[]>([]);
   const [systemLogs, setSystemLogs] = useState<LogData[]>([]);
 
-  // REF untuk menyimpan data terbaru agar bisa dibaca oleh setInterval
   const trxLogsRef = useRef<LogData[]>([]);
   
   const { showNotification } = useNotification(); 
 
-  // Update Ref setiap kali state trxLogs berubah
   useEffect(() => {
     trxLogsRef.current = trxLogs;
   }, [trxLogs]);
@@ -35,19 +31,16 @@ export default function RiwayatPage() {
     const user = localStorage.getItem('username');
     if (user) setUsername(user);
     
-    // 1. Fetch data awal
     fetchHistory();
 
-    // 2. INTERVAL: Cek status pending setiap 10 detik
     const interval = setInterval(() => {
         checkPendingTransactions(); 
-        fetchHistory(true); // Silent refresh
+        fetchHistory(true);
     }, 10000);
 
     return () => clearInterval(interval);
   }, []);
 
-  // --- LOGIKA SINKRONISASI PRODUK (Tombol di Navbar) ---
   const handleSyncData = async () => {
     try {
         const res = await fetch('/api/digi/pricelist', { method: 'POST' });
@@ -67,18 +60,14 @@ export default function RiwayatPage() {
     }
   };
 
-  // --- LOGIKA CEK STATUS BACKGROUND (AUTO UPDATE) ---
   const checkPendingTransactions = async () => {
     const currentLogs = trxLogsRef.current;
 
-    // Filter ketat agar tidak spam request
     const pendingItems = currentLogs.filter(item => {
-        // Cek apakah status 'PENDING' atau 'TRANSACTION'
         const isPendingStatus = item.status === 'PENDING' || 
                                 item.status === 'TRANSACTION' || 
                                 item.description.includes('[PENDING]');
         
-        // PENGAMAN: Pastikan deskripsi TIDAK mengandung kata kunci Success/Failed
         const isActuallyDone = item.description.includes('[SUCCESS]') || 
                                item.description.includes('[FAILED]') || 
                                item.description.includes('Berhasil') || 
@@ -115,7 +104,6 @@ export default function RiwayatPage() {
     }
   };
 
-  // --- LOGIKA FETCH HISTORY ---
   const fetchHistory = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -125,7 +113,6 @@ export default function RiwayatPage() {
       if (json.success) {
         const allData: LogData[] = json.data;
 
-        // Pisahkan Log
         const isSystemLog = (item: LogData) => {
             if (item.source.includes('auth') || item.source.includes('system')) return true;
             const desc = item.description.toUpperCase();
@@ -136,10 +123,8 @@ export default function RiwayatPage() {
         const sys = allData.filter(item => isSystemLog(item));
         const rawTrx = allData.filter(item => !isSystemLog(item));
 
-        // SORTING: Lama -> Terbaru agar status akhir menimpa yang awal
         rawTrx.sort((a, b) => a.date.localeCompare(b.date));
 
-        // DEDUPLIKASI: Ambil status TERBARU per Ref ID
         const trxMap = new Map<string, LogData>();
         rawTrx.forEach(log => {
             if (log.ref_id) {
@@ -147,7 +132,6 @@ export default function RiwayatPage() {
             }
         });
 
-        // SORTING TAMPILAN: Terbaru -> Lama
         const finalTrx = Array.from(trxMap.values()).sort((a, b) => b.date.localeCompare(a.date));
         const finalSys = sys.sort((a, b) => b.date.localeCompare(a.date));
 
@@ -167,7 +151,6 @@ export default function RiwayatPage() {
     if (s === 'SUCCESS' || s.includes('BERHASIL') || s.includes('SUKSES')) {
         return 'bg-green-500/10 text-green-400 border-green-500/20 shadow-[0_0_10px_rgba(74,222,128,0.1)]';
     }
-    // [UPDATE] Tambahkan 'TRANSACTION' ke kondisi PENDING
     if (s === 'PENDING' || s.includes('PROSES') || s === 'TRANSACTION') {
         return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 animate-pulse'; 
     }
@@ -230,7 +213,7 @@ export default function RiwayatPage() {
                                             {log.description.split('|')[0]}
                                         </td>
                                         <td className="p-5 text-center">
-                                            {/* [UPDATE] Ubah Teks TRANSACTION -> PENDING */}
+                                            {/* PENDING */}
                                             <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusBadge(log.status)}`}>
                                                 {log.status === 'PENDING' || log.status === 'TRANSACTION' ? 'PENDING' : log.status}
                                             </span>
@@ -244,7 +227,7 @@ export default function RiwayatPage() {
             </div>
         </div>
 
-        {/* TABEL 2: SYSTEM */}
+        {/* SYSTEM */}
         <div>
             <div className="flex items-center gap-3 mb-6">
                 <div className="w-1.5 h-8 bg-purple-600 rounded-full shadow-[0_0_15px_rgba(147,51,234,0.8)]"></div>

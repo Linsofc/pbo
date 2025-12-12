@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   const { game, userId, zoneId } = await request.json();
 
-  // API Publik Gratisan (Bisa diganti jika punya API Paid sendiri)
   let apiUrl = '';
   
   if (game === 'MOBILE LEGENDS') {

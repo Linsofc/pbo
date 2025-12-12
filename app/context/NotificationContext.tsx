@@ -23,7 +23,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const id = Date.now();
     setNotifications((prev) => [...prev, { id, message, type }]);
 
-    // Auto remove setelah 3 detik
+    // Auto remove setelah 4 detik
     setTimeout(() => {
       setNotifications((prev) => prev.filter((n) => n.id !== id));
     }, 4000);
@@ -67,7 +67,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   );
 }
 
-// Hook Custom
 export function useNotification() {
   const context = useContext(NotificationContext);
   if (!context) {

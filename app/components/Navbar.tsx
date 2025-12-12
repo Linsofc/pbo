@@ -14,29 +14,23 @@ export default function Navbar({ username, onUpdateClick }: NavbarProps) {
     const router = useRouter();
     const pathname = usePathname();
     
-    // State UI
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [saldo, setSaldo] = useState<number | null>(null);
     const [isUpdating, setIsUpdating] = useState(false);
     
-    // Refs
     const dropdownRef = useRef<HTMLDivElement>(null);
     const navRef = useRef<HTMLDivElement>(null);
     const tabsRef = useRef<(HTMLAnchorElement | null)[]>([]);
 
-    // State untuk Animasi Garis Bawah (Sliding Underline)
     const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0, opacity: 0 });
 
-    // Daftar Menu
     const navItems = [
         { name: 'Topup', path: '/' },
         { name: 'Cek Transaksi', path: '/riwayat' },
         { name: 'Kalkulator', path: '/kalkulator' },
     ];
 
-    // --- LOGIC ANIMASI GARIS ---
-    
     const updateIndicator = (element: HTMLElement) => {
         if (!element) return;
         setIndicatorStyle({
@@ -46,7 +40,6 @@ export default function Navbar({ username, onUpdateClick }: NavbarProps) {
         });
     };
 
-    // 1. Set posisi awal berdasarkan halaman aktif saat ini
     useEffect(() => {
         const activeIndex = navItems.findIndex(item => item.path === pathname);
         if (activeIndex !== -1 && tabsRef.current[activeIndex]) {
@@ -54,14 +47,12 @@ export default function Navbar({ username, onUpdateClick }: NavbarProps) {
         }
     }, [pathname]);
 
-    // 2. Event Handler Hover
     const handleMouseEnter = (index: number) => {
         if (tabsRef.current[index]) {
             updateIndicator(tabsRef.current[index]!);
         }
     };
 
-    // 3. Event Handler Mouse Leave (Kembali ke aktif)
     const handleMouseLeave = () => {
         const activeIndex = navItems.findIndex(item => item.path === pathname);
         if (activeIndex !== -1 && tabsRef.current[activeIndex]) {
@@ -70,8 +61,6 @@ export default function Navbar({ username, onUpdateClick }: NavbarProps) {
             setIndicatorStyle(prev => ({ ...prev, opacity: 0 }));
         }
     };
-
-    // --- LOGIC LAINNYA (Profile, Balance, dll) ---
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {

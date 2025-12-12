@@ -10,13 +10,10 @@ export async function POST() {
       return NextResponse.json({ success: false, message: 'Konfigurasi Server Belum Lengkap' });
     }
 
-    // 1. Generate Signature Khusus Cek Saldo
-    // Rumus: md5(username + key + "depo")
     const signature = crypto.createHash('md5')
       .update(username + key + "depo")
       .digest('hex');
 
-    // 2. Request ke Digiflazz
     const payload = {
       cmd: "deposit",
       username: username,
@@ -31,11 +28,9 @@ export async function POST() {
 
     const data = await res.json();
 
-    // 3. Response Handling
     if (data.data) {
         return NextResponse.json({
             success: true,
-            // Digiflazz mengembalikan saldo dalam field 'deposit'
             balance: data.data.deposit, 
         });
     } else {
