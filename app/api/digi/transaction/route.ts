@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { sendLogToBackend } from "@/utils/logger";
+import { connectToDatabase } from "@/utils/db";
 
 export async function POST(request: Request) {
     try {
@@ -47,15 +48,27 @@ export async function POST(request: Request) {
         const data = await res.json();
 
         if (data.data) {
-            const { status, sn, rc, message } = data.data;
-            const serialNumber = sn || "";
+            const { status, sn, rc, message, buyer_last_balance } = data.data;
+            const { db } = await connectToDatabase();
+
+            const transactionData = {
+                ref_id,
+                customer_no,
+                buyer_sku_code,
+                status,
+                sn: sn || "",
+                message: message || "",
+                price: data.data.price || 0,
+                createdAt: new Date(),
+            };
+
+            await db.collection("transactions").insertOne(transactionData);
 
             if (rc === "00" || status === "Sukses") {
                 await sendLogToBackend(
                     "transaction",
-                    `[SUCCESS] Order ${ref_id} - ${buyer_sku_code}. SN: ${serialNumber} | ${customer_no}`
+                    `[SUCCESS] Order ${ref_id} - ${buyer_sku_code}`
                 );
-
                 return NextResponse.json({
                     success: true,
                     message: "Transaksi Berhasil",
