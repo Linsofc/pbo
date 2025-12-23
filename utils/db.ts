@@ -1,7 +1,5 @@
-// utils/db.ts
 import { MongoClient } from 'mongodb';
 
-// Pastikan kode ini tidak terpanggil di Client Component
 const uri = process.env.MONGODB_URI || "";
 const client = new MongoClient(uri);
 

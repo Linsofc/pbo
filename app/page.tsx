@@ -93,36 +93,38 @@ export default function Home() {
     };
 
     // --- SINKRONISASI ---
-    const handleSyncData = async () => {
-        try {
-            const res = await fetch("/api/digi/pricelist", { method: "POST" });
-            const result = await res.json();
+    // Contoh di app/page.tsx atau layout.tsx
+const handleUpdateClick = async () => {
+    try {
+        // Ambil session untuk mendapatkan username
+        const username = localStorage.username;
 
-            if (
-                result.success &&
-                Array.isArray(result.data) &&
-                result.data.length > 0
-            ) {
-                localStorage.setItem(
-                    "DIGI_PRODUCTS_CACHE",
-                    JSON.stringify(result.data)
-                );
-                processProducts(result.data);
-                showNotification(
-                    `Sukses! ${result.data.length} produk diperbarui.`,
-                    "success"
-                );
-                return true;
-            } else {
-                showNotification(`Gagal: ${result.message}`, "error");
-                return false;
-            }
-        } catch (e) {
-            showNotification("Gagal koneksi ke server.", "error");
+        if (!username) {
+            alert("Sesi berakhir, silakan login kembali");
             return false;
         }
-    };
 
+        const res = await fetch("/api/digi/pricelist", {
+            method: "POST",
+            headers: { 
+                "Content-Type": "application/json" 
+            },
+            body: JSON.stringify({ username }) // DATA INI YANG DITUNGGU SERVER
+        });
+
+        const result = await res.json();
+        if (result.success) {
+            alert("Data produk berhasil diperbarui!");
+            return true;
+        } else {
+            alert("Gagal update: " + result.message);
+            return false;
+        }
+    } catch (error) {
+        console.error("Error updating pricelist:", error);
+        return false;
+    }
+};
     // --- INTERAKSI USER ---
 
     const handleBrandClick = (brand: string, category: string) => {
@@ -292,7 +294,7 @@ export default function Home() {
 
     return (
         <div className="min-h-screen text-white pb-20">
-            <Navbar username={username} onUpdateClick={handleSyncData} />
+            <Navbar username={username} onUpdateClick={handleUpdateClick} />
 
             <main className="max-w-7xl mx-auto px-4 py-8">
                 {!selectedBrand ? (
